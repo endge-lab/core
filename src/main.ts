@@ -344,3 +344,5 @@ export * from '@/features/core/modules/runtime/domain/controllers/page-cache.typ
 export * from '@/features/core/modules/runtime/hosts/ControllerRuntimeHost'
 export * from '@/features/core/modules/runtime/EndgeControllers_Module'
 export * from '@/features/core/modules/runtime/services/controllers/builtins/collection-window.definition'
+
+export * from '@/features/core/modules/domain/component/timeline-task-recipe'

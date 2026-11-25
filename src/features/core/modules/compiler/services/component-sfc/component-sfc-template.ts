@@ -41,10 +41,12 @@ import {
   hasComponentSFCPassivePreventConflict,
 } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-interactions'
 import { compileComponentSFCLocalEventActions } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-ports'
+import { readPreviewLiteral } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-script'
 import { normalizeComponentSFCTableColumnPin } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-pin'
 import { normalizeComponentSFCTableSort } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-sort'
 import { normalizeComponentSFCTableColumnVisibility } from '@/features/core/modules/compiler/services/component-sfc/component-sfc-table-visibility'
 import { DEFAULT_ENDGE_SFC_EDITING_CONFIGURATION } from '@/features/core/modules/domain/component/sfc-editing.config'
+import { validateTimelineRecipeLayout } from '@/features/core/modules/domain/component/timeline-task-recipe'
 import { createEmptyComponentDependencies } from '@/features/core/modules/domain/types/component/component-core.types'
 import { createEmptyComponentSFCPortManifest } from '@/features/core/modules/domain/types/component/sfc/ports.types'
 import { isContextSwitchCall, selectContextSwitchNode } from '@/features/core/modules/source/services/compilers/source-expression-compile'
@@ -57,6 +59,8 @@ export interface ComponentSFCTemplateCompileContext {
 
   // Имена locals для классификации expression reads.
   locals: string[]
+
+  timelineChartChild?: boolean
 
   // Порты локального компонента имеют приоритет над глобальным реестром пользовательских тегов.
   componentPorts?: ComponentSFCComponentPort[]
@@ -242,6 +246,12 @@ function compileElementNode(
   metadata: ProgramNodeMetadata[],
   diagnostics: RComponentDiagnostic[],
 ): RComponentSFC_IR_ElementNode | null {
+  if (node.tag === 'TimelineTaskRecipe') {
+    return compileTimelineTaskRecipe(node, id, context, diagnostics)
+  }
+  if (node.tag === 'Column' && context.timelineChartChild) {
+    return compileTimelineColumn(node, id, context, diagnostics)
+  }
   const isBuiltIn = isComponentSFCBuiltInTag(node.tag)
   const localComponentPort = isBuiltIn
     ? null
@@ -378,7 +388,7 @@ function compileElementNode(
         compileTemplateNode(
           child,
           `${id}-${index}`,
-          context,
+          { ...context, timelineChartChild: tag === 'TimelineChart' },
           dependencies,
           metadata,
           diagnostics,
@@ -457,7 +467,7 @@ function compileElementNode(
   if (element.tag === 'TimelineGroup' || element.tag === 'TimelineChart') {
     const children = element.children.filter(child => child.kind !== 'text' || Boolean(child.value.trim()))
     const invalid = element.tag === 'TimelineChart'
-      ? children.length > 0
+      ? children.some(child => child.kind !== 'element' || (child.tag !== 'TimelineTaskRecipe' && child.tag !== 'Column'))
       : children.some(child => child.kind !== 'element' || child.tag !== 'TimelineChart')
     if (invalid) {
       diagnostics.push({
@@ -465,11 +475,41 @@ function compileElementNode(
         code: 'sfc-timeline-children',
         message: element.tag === 'TimelineGroup'
           ? 'TimelineGroup принимает только прямые дочерние TimelineChart.'
-          : 'TimelineChart не принимает дочерние узлы.',
+          : 'TimelineChart принимает только прямые дочерние Column и TimelineTaskRecipe.',
         sourcePath: `template.${id}`,
         start: node.range.start,
         end: node.range.end,
       })
+    }
+    if (element.tag === 'TimelineChart') {
+      if (element.props.columns && children.some(child => child.kind === 'element' && child.tag === 'Column')) {
+        diagnostics.push({
+          severity: 'error',
+          code: 'sfc-timeline-column-conflict',
+          message: 'Выберите один способ задать колонки TimelineChart: :columns или дочерние Column.',
+          sourcePath: `template.${id}`,
+          start: node.range.start,
+          end: node.range.end,
+        })
+      }
+      const ids = new Set<unknown>()
+      for (const child of children) {
+        if (child.kind !== 'element' || child.tag !== 'TimelineTaskRecipe') {
+          continue
+        }
+        const recipeId = child.props.id?.kind === 'literal' ? child.props.id.value : undefined
+        if (ids.has(recipeId)) {
+          diagnostics.push({
+            severity: 'error',
+            code: 'sfc-timeline-recipe-duplicate-id',
+            message: `ID рецепта "${recipeId}" должен быть уникальным в TimelineChart.`,
+            sourcePath: 'template',
+            start: child.sourceRange?.start,
+            end: child.sourceRange?.end,
+          })
+        }
+        ids.add(recipeId)
+      }
     }
     if (element.tag === 'TimelineGroup' && element.children.some(child => child.kind === 'element'
       && child.tag === 'TimelineChart' && child.directives.for && !child.directives.key)) {
@@ -485,6 +525,114 @@ function compileElementNode(
   }
 
   return element
+}
+
+function compileTimelineColumn(
+  node: RComponentSFC_AST_ElementNode,
+  id: string,
+  context: ComponentSFCTemplateCompileContext,
+  diagnostics: RComponentDiagnostic[],
+): RComponentSFC_IR_ElementNode {
+  const key = node.directives.find(item => item.name === 'key')
+  const columnAttributes = node.attributes.filter(item => item.name !== 'value')
+  const props = {
+    ...compileAttributes(columnAttributes, context, diagnostics),
+    ...compileAttributes(
+      node.attributes.filter(item => item.name === 'value'),
+      { ...context, locals: [...context.locals, '$group'] },
+      diagnostics,
+    ),
+  }
+  if (key?.expression && !props.id) {
+    props.id = key.argument
+      ? compileDirectiveExpression(key, context, diagnostics)
+      : { kind: 'literal', value: key.expression }
+  }
+  if (node.children.some(child => child.kind !== 'comment' && (child.kind !== 'text' || child.content.trim()))
+    || node.directives.some(item => item.name !== 'key') || !props.id || (props.field == null && props.value == null)) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-timeline-column',
+      message: 'Колонке TimelineChart нужны key или id и field или :value. Дочерние узлы и управляющие директивы здесь недоступны.',
+      sourcePath: `template.${id}`,
+      start: node.range.start,
+      end: node.range.end,
+    })
+  }
+  return { id, kind: 'element', tag: 'Column', props, directives: {}, children: [], sourceRange: node.range }
+}
+
+export function readComponentSFCTimelineRecipeLayout(source: string) {
+  const result = readPreviewLiteral(parseExpression(source))
+  if (!result.ok) {
+    throw new TypeError('Рецепт должен содержать JSON или литерал объекта.')
+  }
+  const layout: unknown = JSON.parse(JSON.stringify(result.value))
+  validateTimelineRecipeLayout(layout)
+  return layout
+}
+
+function compileTimelineTaskRecipe(
+  node: RComponentSFC_AST_ElementNode,
+  id: string,
+  context: ComponentSFCTemplateCompileContext,
+  diagnostics: RComponentDiagnostic[],
+): RComponentSFC_IR_ElementNode | null {
+  const props: RComponentSFC_IR_ElementNode['props'] = {}
+  const attribute = (name: string, dynamic = false) =>
+    node.attributes.find(item => item.name === name && item.dynamic === dynamic)?.value?.trim()
+  try {
+    if (!context.timelineChartChild) {
+      throw new Error('TimelineTaskRecipe должен находиться непосредственно в TimelineChart.')
+    }
+    if (node.directives.length || node.children.some(child => child.kind !== 'comment'
+      && (child.kind !== 'text' || child.content.trim()))) {
+      throw new Error('TimelineTaskRecipe не принимает директивы и дочерние узлы.')
+    }
+    const allowed = ['id', 'name', 'kind', 'when', 'recipe']
+    const names = new Set<string>()
+    for (const item of node.attributes) {
+      if (!allowed.includes(item.name) || names.has(item.name) || item.modifiers.length
+        || item.dynamic !== (item.name === 'when' || item.name === 'recipe')) {
+        throw new Error(`Некорректный атрибут рецепта "${item.name}".`)
+      }
+      names.add(item.name)
+    }
+    const recipeId = attribute('id')
+    const kind = attribute('kind')
+    const when = attribute('when', true)
+    const recipe = attribute('recipe', true)
+    if (!recipeId || (!kind && !when) || !recipe || (names.has('when') && !when)) {
+      throw new Error('Укажите ID, kind или :when и JSON в :recipe.')
+    }
+    const layout = readComponentSFCTimelineRecipeLayout(recipe)
+    props.id = { kind: 'literal', value: recipeId }
+    props.recipe = { kind: 'literal', value: layout }
+    if (kind) {
+      props.kind = { kind: 'literal', value: kind }
+    }
+    if (when) {
+      const result = compileComponentSFCExpression(when, {
+        props: context.props,
+        locals: [...context.locals, '$task', '$group'],
+        sourcePath: `template.${id}.when`,
+      })
+      diagnostics.push(...result.diagnostics)
+      props.when = result.value
+    }
+  }
+  catch (error) {
+    diagnostics.push({
+      severity: 'error',
+      code: 'sfc-timeline-recipe',
+      message: error instanceof Error ? error.message : String(error),
+      sourcePath: `template.${id}`,
+      start: node.range.start,
+      end: node.range.end,
+    })
+    return null
+  }
+  return { id, kind: 'element', tag: 'TimelineTaskRecipe', props, directives: {}, children: [], sourceRange: node.range }
 }
 
 function compileRequiredPortBindings(

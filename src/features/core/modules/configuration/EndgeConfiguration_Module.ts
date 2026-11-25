@@ -74,8 +74,13 @@ export class EndgeConfiguration_Module extends EndgeModule<EndgeBootContext> {
         configuration = applyEndgeConfigurationContribution(configuration, document?.configuration ?? EMPTY_CONTRIBUTION)
       }
     }
-    if (JSON.stringify(configuration.defaultRenderers) !== JSON.stringify(this._current.defaultRenderers)) {
-      this._current = { ...this._current, defaultRenderers: configuration.defaultRenderers }
+    if (JSON.stringify(configuration.defaultRenderers) !== JSON.stringify(this._current.defaultRenderers)
+      || JSON.stringify(configuration.timelinePresets) !== JSON.stringify(this._current.timelinePresets)) {
+      this._current = {
+        ...this._current,
+        defaultRenderers: configuration.defaultRenderers,
+        timelinePresets: configuration.timelinePresets,
+      }
       this.notify()
     }
   }

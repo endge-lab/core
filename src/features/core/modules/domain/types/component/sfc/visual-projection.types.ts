@@ -370,11 +370,22 @@ export interface ComponentSFCTableVisualProjection {
   sourceRange: RComponentSFC_SourceRange
 }
 
+export interface ComponentSFCTimelineRecipeVisualNode {
+  id: string
+  name: string
+  kind: string
+  when: string
+  json: string
+  sourceRange: RComponentSFC_SourceRange
+}
+
 export interface ComponentSFCTimelineVisualNode {
   tag: 'TimelineChart' | 'TimelineGroup'
   attributes: ComponentSFCVisualAttribute[]
   sourceRange: RComponentSFC_SourceRange
   charts: ComponentSFCTimelineVisualNode[]
+  recipes: ComponentSFCTimelineRecipeVisualNode[]
+  columns: Pick<ComponentSFCTimelineVisualNode, 'attributes' | 'sourceRange'>[]
 }
 
 // Результат выбора специализированного visual editor для SFC source.

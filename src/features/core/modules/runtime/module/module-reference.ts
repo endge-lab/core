@@ -7,6 +7,14 @@ export interface ModuleRendererReference extends ModuleReference {
   rendererId: string
 }
 
+export interface ModuleTimelinePresetReference extends ModuleReference {
+  name: string
+}
+
+export function isTimelinePresetName(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && new TextEncoder().encode(value).length <= 128
+}
+
 export const ADAPTER_RENDERER_SELECTION = 'adapter:default'
 
 export function isModuleRendererId(value: unknown): value is string {

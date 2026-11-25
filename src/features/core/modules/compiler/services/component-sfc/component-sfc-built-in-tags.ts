@@ -18,6 +18,7 @@ export const ENDGE_SFC_BUILT_IN_TAGS = new Set<RComponentSFC_IR_Tag>([
   'Component',
   'Table',
   'TimelineChart',
+  'TimelineTaskRecipe',
   'TimelineGroup',
   'Column',
   'Cell',
